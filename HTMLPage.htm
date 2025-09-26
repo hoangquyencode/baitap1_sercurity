@@ -1,0 +1,205 @@
+﻿<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Mật mã Affine (Tiếng Việt)</title>
+    <style>
+        body {
+            font-family: system-ui,Segoe UI,Roboto,Arial;
+            padding: 18px;
+            max-width: 900px;
+            margin: auto
+        }
+
+        label {
+            display: inline-block;
+            margin-right: 8px
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            margin-top: 6px
+        }
+
+        .row {
+            margin: 12px 0
+        }
+
+        input[type=number] {
+            width: 70px
+        }
+
+        pre {
+            background: #f6f8fa;
+            padding: 10px;
+            border-radius: 6px;
+            white-space: pre-wrap
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center
+        }
+
+        button {
+            padding: 8px 12px;
+            border-radius: 6px
+        }
+
+        .small {
+            font-size: 0.9rem;
+            color: #333
+        }
+    </style>
+</head>
+<body>
+    <h2>Mật mã Affine — Web (Tiếng Việt)</h2>
+
+    <div class="row">
+        <label for="text">Nhập văn bản:</label>
+        <textarea id="text" placeholder="Nhập văn bản ở đây...">HAT</textarea>
+    </div>
+
+    <div class="row controls">
+        <div>
+            <label><input type="radio" name="mode" value="encrypt" checked> Mã hóa</label>
+            <label><input type="radio" name="mode" value="decrypt"> Giải mã</label>
+        </div>
+
+        <div>
+            <label>a (coprime với 26): <input id="a" type="number" value="5" min="1" max="25"></label>
+            <label>b: <input id="b" type="number" value="3" min="0" max="25"></label>
+        </div>
+
+        <div>
+            <label><input id="preserveCase" type="checkbox" checked> Giữ chữ hoa/thường</label>
+            <label><input id="preserveNonAlpha" type="checkbox" checked> Giữ ký tự không phải chữ</label>
+        </div>
+
+        <div style="margin-left:auto">
+            <button id="run">Thực hiện</button>
+            <button id="brute">Thử tất cả khóa</button>
+            <button id="copy">Copy kết quả</button>
+        </div>
+    </div>
+
+    <div class="row">
+        <label>Kết quả:</label>
+        <pre id="result" class="small"></pre>
+    </div>
+
+    <div class="row">
+        <label>Kết quả brute-force (tất cả cặp a,b hợp lệ):</label>
+        <pre id="bruteRes" style="max-height:300px;overflow:auto" class="small"></pre>
+    </div>
+
+    <script>
+(() => {
+  const ALPH = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const M = ALPH.length;
+
+  // Extended Euclid -> trả về {g, x, y}
+  function egcd(a,b){
+    if(b===0) return {g:a, x:1, y:0};
+    const r = egcd(b, a % b);
+    return {g:r.g, x:r.y, y:r.x - Math.floor(a/b)*r.y};
+  }
+
+  function modInv(a, m){
+    const r = egcd(a, m);
+    if(r.g !== 1) return null;
+    let x = r.x % m;
+    if(x < 0) x += m;
+    return x;
+  }
+
+  function gcd(a,b){ return b===0? a : gcd(b, a%b); }
+
+  // Map single letter (uppercase) using affine
+  function mapLetterUpper(ch, a, b, enc, aInv){
+    const idx = ALPH.indexOf(ch);
+    if(idx === -1) return ch;
+    if(enc){
+      return ALPH[(a*idx + b) % M];
+    } else {
+      const x = (aInv * ((idx - b) % M + M)) % M;
+      return ALPH[x];
+    }
+  }
+
+  function processText(text, a, b, enc, options){
+    const preserveCase = options.preserveCase;
+    const preserveNonAlpha = options.preserveNonAlpha;
+    const aInv = modInv(a, M);
+    if(!enc && aInv === null) return {error: "Giá trị 'a' không có nghịch đảo modulo 26."};
+
+    let out = "";
+    for(let ch of text){
+      const isLetter = /[A-Za-z]/.test(ch);
+      if(!isLetter){
+        if(preserveNonAlpha) out += ch;
+        else continue; // bỏ ký tự không phải chữ nếu ko giữ
+      } else {
+        const isLower = (ch === ch.toLowerCase());
+        const upper = ch.toUpperCase();
+        const mappedUpper = mapLetterUpper(upper, a, b, enc, aInv);
+        out += (preserveCase ? (isLower ? mappedUpper.toLowerCase() : mappedUpper) : mappedUpper);
+      }
+    }
+    return {text: out};
+  }
+
+  // UI
+  const el = id => document.getElementById(id);
+  const runBtn = el('run'), bruteBtn = el('brute'), copyBtn = el('copy');
+  const resEl = el('result'), bruteEl = el('bruteRes');
+
+  runBtn.addEventListener('click', ()=>{
+    const text = el('text').value || "";
+    const a = Number(el('a').value);
+    const b = Number(el('b').value);
+    const mode = document.querySelector('input[name="mode"]:checked').value;
+    if(!Number.isInteger(a) || !Number.isInteger(b)){ resEl.textContent = "a và b phải là số nguyên."; return; }
+    if(gcd(a, M) !== 1){ resEl.textContent = "Lỗi: a phải nguyên tố cùng nhau với 26."; return; }
+    if(b < 0 || b >= M){ resEl.textContent = "b phải trong khoảng 0..25."; return; }
+
+    const options = { preserveCase: el('preserveCase').checked, preserveNonAlpha: el('preserveNonAlpha').checked };
+    const enc = (mode === 'encrypt');
+    const r = processText(text, a, b, enc, options);
+    if(r.error) resEl.textContent = "Lỗi: " + r.error;
+    else resEl.textContent = r.text;
+  });
+
+  bruteBtn.addEventListener('click', ()=>{
+    const ct = el('text').value || "";
+    const keepCase = el('preserveCase').checked;
+    const keepNon = el('preserveNonAlpha').checked;
+    let out = [];
+    for(let a=1;a<M;a++){
+      if(gcd(a,M) !== 1) continue;
+      for(let b=0;b<M;b++){
+        const r = processText(ct, a, b, false, {preserveCase: keepCase, preserveNonAlpha: keepNon});
+        out.push(`(${a},${b}) -> ${r.text||"(error)"}`);
+      }
+    }
+    bruteEl.textContent = out.join("\n");
+  });
+
+  copyBtn.addEventListener('click', async ()=>{
+    try{
+      await navigator.clipboard.writeText(resEl.textContent || "");
+      copyBtn.textContent = "Đã copy";
+      setTimeout(()=> copyBtn.textContent = "Copy kết quả", 1200);
+    }catch(e){
+      alert("Không thể copy tự động — hãy copy thủ công.");
+    }
+  });
+
+})();
+    </script>
+</body>
+</html>
