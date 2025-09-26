@@ -1,0 +1,154 @@
+﻿<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <title>Mã hóa Vigenère</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 16px;
+            background: #f9f9f9;
+        }
+
+        h1 {
+            text-align: center;
+            color: darkgreen;
+            margin-bottom: 20px;
+        }
+
+        label {
+            font-weight: bold;
+            margin-top: 12px;
+            display: block;
+        }
+
+        textarea, input {
+            width: 100%;
+            padding: 10px;
+            font-size: 1rem;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+
+        textarea {
+            height: 100px;
+            font-family: monospace;
+        }
+
+        .row {
+            margin: 15px 0;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            transition: 0.2s;
+        }
+
+        #encrypt {
+            background: #4CAF50;
+            color: white;
+        }
+
+            #encrypt:hover {
+                background: #45a049;
+            }
+
+        #decrypt {
+            background: #2196F3;
+            color: white;
+        }
+
+            #decrypt:hover {
+                background: #1976d2;
+            }
+
+        #clear {
+            background: #777;
+            color: white;
+        }
+
+            #clear:hover {
+                background: #555;
+            }
+
+        #output {
+            background: #f0f0f0;
+            height: 150px;
+        }
+    </style>
+</head>
+<body>
+    <h1>MÃ HÓA VIGENÈRE</h1>
+
+    <label>Khóa (Key):</label>
+    <input id="key" type="text" placeholder="Nhập khóa, ví dụ: LE MONDE" />
+
+    <label>Chuỗi (Bản rõ hoặc Bản mã):</label>
+    <textarea id="text" placeholder="Nhập chuỗi cần xử lý..."></textarea>
+
+    <div class="row">
+        <button id="encrypt">Mã hóa</button>
+        <button id="decrypt">Giải mã</button>
+        <button id="clear">Xóa</button>
+    </div>
+
+    <label>Kết quả:</label>
+    <textarea id="output" readonly></textarea>
+
+    <script>
+        function up(c) {
+            return c.toUpperCase();
+        }
+
+        // Hàm xử lý Vigenère (encrypt=true -> mã hóa, false -> giải mã)
+        function vigenere(text, key, encrypt = true) {
+            if (!key) return text;
+            key = key.toUpperCase().replace(/[^A-Z]/g, ''); // chỉ giữ chữ cái
+            if (!key.length) return text;
+
+            let out = "", j = 0;
+            for (let i = 0; i < text.length; i++) {
+                let c = text[i];
+                let C = up(c);
+                if (C >= 'A' && C <= 'Z') {
+                    let pk = key[j % key.length].charCodeAt(0) - 65;
+                    let t = C.charCodeAt(0) - 65;
+                    let r = encrypt ? (t + pk) % 26 : (t - pk + 26) % 26;
+                    out += String.fromCharCode(r + 65);
+                    j++;
+                } else {
+                    out += c; // giữ nguyên ký tự khác
+                }
+            }
+            return out;
+        }
+
+        document.getElementById('encrypt').onclick = () => {
+            const k = document.getElementById('key').value;
+            const t = document.getElementById('text').value;
+            document.getElementById('output').value = vigenere(t, k, true);
+        };
+        document.getElementById('decrypt').onclick = () => {
+            const k = document.getElementById('key').value;
+            const t = document.getElementById('text').value;
+            document.getElementById('output').value = vigenere(t, k, false);
+        };
+        document.getElementById('clear').onclick = () => {
+            document.getElementById('text').value = '';
+            document.getElementById('output').value = '';
+        };
+    </script>
+</body>
+</html>

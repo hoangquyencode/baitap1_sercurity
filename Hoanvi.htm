@@ -1,0 +1,210 @@
+﻿<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Mã hóa Hoán vị Cột</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 16px;
+        }
+
+        h1 {
+            text-align: center;
+            color: darkblue;
+        }
+
+        label {
+            font-weight: bold;
+            margin-top: 12px;
+            display: block;
+        }
+
+        textarea, input {
+            width: 100%;
+            padding: 8px;
+            font-size: 1rem;
+        }
+
+        textarea {
+            height: 100px;
+            font-family: monospace;
+        }
+
+        .row {
+            margin: 10px 0;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+        }
+
+        #encrypt {
+            background: #4CAF50;
+            color: white;
+        }
+
+        #decrypt {
+            background: #2196F3;
+            color: white;
+        }
+
+        #attack {
+            background: #FF5722;
+            color: white;
+        }
+
+        #clear {
+            background: #777;
+            color: white;
+        }
+
+        #output {
+            background: #f0f0f0;
+            height: 150px;
+        }
+
+        pre {
+            background: #fafafa;
+            padding: 10px;
+            border: 1px solid #ccc;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>MÃ HÓA HOÁN VỊ CỘT</h1>
+
+    <label>Khóa (Key):</label>
+    <input id="key" type="text" placeholder="Nhập khóa, ví dụ: ZEBRA" />
+
+    <label>Chuỗi (Bản rõ hoặc Bản mã):</label>
+    <textarea id="text" placeholder="Nhập chuỗi cần xử lý..."></textarea>
+
+    <div class="row">
+        <button id="encrypt">Mã hóa</button>
+        <button id="decrypt">Giải mã</button>
+        <button id="attack">Phá mã</button>
+        <button id="clear">Xóa</button>
+    </div>
+
+    <label>Kết quả:</label>
+    <textarea id="output" readonly></textarea>
+
+    <div id="attackResults"></div>
+
+    <script>
+        function normalize(s) {
+            return s.replace(/\s+/g, '').toUpperCase();
+        }
+
+        function keyOrder(key) {
+            const arr = [];
+            for (let i = 0; i < key.length; i++) arr.push({ ch: key[i].toUpperCase(), idx: i });
+            arr.sort((a, b) => a.ch < b.ch ? -1 : (a.ch > b.ch ? 1 : a.idx - b.idx));
+            const order = new Array(key.length);
+            for (let rank = 0; rank < key.length; rank++) {
+                order[arr[rank].idx] = rank;
+            }
+            return order;
+        }
+
+        function encrypt(plaintext, key, pad = 'X') {
+            if (!key) return plaintext;
+            const pt = normalize(plaintext);
+            const cols = key.length;
+            const rows = Math.ceil(pt.length / cols);
+            const fullSize = rows * cols;
+            let padded = pt + pad.repeat(fullSize - pt.length);
+            const table = [];
+            for (let r = 0; r < rows; r++) {
+                table[r] = padded.slice(r * cols, r * cols + cols).split('');
+            }
+            const order = keyOrder(key);
+            let ct = '';
+            for (let rank = 0; rank < cols; rank++) {
+                for (let c = 0; c < cols; c++) if (order[c] == rank) {
+                    for (let r = 0; r < rows; r++) ct += table[r][c];
+                }
+            }
+            return ct;
+        }
+
+        function decrypt(ciphertext, key, pad = 'X') {
+            if (!key) return ciphertext;
+            const ct = normalize(ciphertext);
+            const cols = key.length;
+            const rows = Math.ceil(ct.length / cols);
+            const order = keyOrder(key);
+            const colData = new Array(cols).fill('');
+            let p = 0;
+            for (let rank = 0; rank < cols; rank++) {
+                for (let c = 0; c < cols; c++) if (order[c] == rank) {
+                    colData[c] = ct.slice(p, p + rows).split('');
+                    p += rows;
+                }
+            }
+            let pt = '';
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (r < colData[c].length) pt += colData[c][r];
+                }
+            }
+            while (pt.endsWith(pad)) pt = pt.slice(0, -1);
+            return pt;
+        }
+
+        // Brute force attack: thử nhiều độ dài khóa
+        function bruteForce(ciphertext, maxKeyLen = 6) {
+            const ct = normalize(ciphertext);
+            let results = [];
+            for (let cols = 2; cols <= maxKeyLen; cols++) {
+                const rows = Math.ceil(ct.length / cols);
+                // giả sử khóa = "123...cols"
+                let key = "";
+                for (let i = 0; i < cols; i++) key += String.fromCharCode(65 + i); // ABC..
+                const pt = decrypt(ct, key);
+                results.push(`Giả sử độ dài khóa = ${cols}: ${pt}`);
+            }
+            return results;
+        }
+
+        // Nút
+        document.getElementById('encrypt').onclick = () => {
+            const key = document.getElementById('key').value;
+            const text = document.getElementById('text').value;
+            document.getElementById('output').value = encrypt(text, key);
+            document.getElementById('attackResults').innerHTML = '';
+        };
+        document.getElementById('decrypt').onclick = () => {
+            const key = document.getElementById('key').value;
+            const text = document.getElementById('text').value;
+            document.getElementById('output').value = decrypt(text, key);
+            document.getElementById('attackResults').innerHTML = '';
+        };
+        document.getElementById('attack').onclick = () => {
+            const text = document.getElementById('text').value;
+            const res = bruteForce(text, 6);
+            let html = '<h3>Kết quả phá mã (thử nhiều độ dài khóa):</h3><pre>';
+            html += res.join('\n\n');
+            html += '</pre>';
+            document.getElementById('attackResults').innerHTML = html;
+        };
+        document.getElementById('clear').onclick = () => {
+            document.getElementById('text').value = '';
+            document.getElementById('output').value = '';
+            document.getElementById('attackResults').innerHTML = '';
+        };
+    </script>
+</body>
+</html>
